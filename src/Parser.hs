@@ -1,15 +1,15 @@
-module Parser (Parser, char, string) where
+module Parser (module Parser) where
 
 import Control.Applicative (Alternative (empty), (<|>))
 
-newtype Parser a = Parser {runParser :: String -> Maybe (a, String)}
+newtype Parser t a = Parser {runParser :: [t] -> Maybe (a, [t])}
 
-instance Functor Parser where
+instance Functor (Parser t) where
   fmap f (Parser p) = Parser $ \s -> do
     (res, rem_s) <- p s
     return (f res, rem_s)
 
-instance Applicative Parser where
+instance Applicative (Parser t) where
   pure x = Parser $ \s -> Just (x, s)
 
   (Parser f) <*> (Parser p) = Parser $ \s -> do
@@ -17,12 +17,12 @@ instance Applicative Parser where
     (res, s2) <- p s1
     return (f' res, s2)
 
-instance Monad Parser where
+instance Monad (Parser t) where
   (Parser p) >>= f = Parser $ \s -> do
     (res, s1) <- p s
     runParser (f res) s1
 
-instance Alternative Parser where
+instance Alternative (Parser t) where
   empty = Parser $ const Nothing
 
   (Parser x) <|> (Parser y) = Parser $ \s ->
@@ -30,13 +30,18 @@ instance Alternative Parser where
       Just res -> Just res
       Nothing -> y s
 
-char :: Char -> Parser Char
-char c = Parser matchChar
+symIf :: (t -> Bool) -> Parser t t
+symIf f = Parser matchSym
   where
-    matchChar [] = Nothing
-    matchChar (x : xs)
-      | x == c = Just (x, xs)
+    matchSym [] = Nothing
+    matchSym (x : xs)
+      | f x = Just (x, xs)
       | otherwise = Nothing
 
-string :: String -> Parser String
-string = mapM char
+lst :: (Eq t) => [t] -> Parser t [t]
+lst = mapM sym
+
+sym :: (Eq t) => t -> Parser t t
+sym c = symIf (== c)
+
+type StringParser = Parser Char
